@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Panel LEDs</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Panel de control — 4 LEDs</h1>
+      <p class="sub">Desliza para ajustar brillo (0–255)</p>
+    </div>
+    <a class="logout" href="/logout">Salir</a>
+  </header>
+
+  <main class="wrap">
+    <section class="grid">
+
+      <article class="card">
+        <div class="card-head">
+          <div class="dot" id="d1"></div>
+          <div class="titles">
+            <h2>LED 1</h2>
+            <p>Brillo PWM</p>
+          </div>
+          <div class="pill">Valor: <span id="v1">0</span></div>
+        </div>
+        <input id="s1" type="range" min="0" max="255" value="0">
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="dot" id="d2"></div>
+          <div class="titles">
+            <h2>LED 2</h2>
+            <p>Brillo PWM</p>
+          </div>
+          <div class="pill">Valor: <span id="v2">0</span></div>
+        </div>
+        <input id="s2" type="range" min="0" max="255" value="0">
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="dot" id="d3"></div>
+          <div class="titles">
+            <h2>LED 3</h2>
+            <p>Brillo PWM</p>
+          </div>
+          <div class="pill">Valor: <span id="v3">0</span></div>
+        </div>
+        <input id="s3" type="range" min="0" max="255" value="0">
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="dot" id="d4"></div>
+          <div class="titles">
+            <h2>LED 4</h2>
+            <p>Brillo PWM</p>
+          </div>
+          <div class="pill">Valor: <span id="v4">0</span></div>
+        </div>
+        <input id="s4" type="range" min="0" max="255" value="0">
+      </article>
+
+    </section>
+
+    <section class="console">
+      <div class="console-head">
+        <strong>Consola</strong>
+        <button id="btnClear" class="btn">Limpiar</button>
+      </div>
+      <pre id="log" class="log">Listo.</pre>
+    </section>
+  </main>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
