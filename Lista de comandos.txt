@@ -1,0 +1,458 @@
+LISTA COMPLETA DE COMANDOS (desde snapd) PARA PODER SUBIR UN PROGRAMA A ARDUINO UNO
+
+
+1) Instalar y activar snapd
+sudo apt update
+sudo apt install -y snapd
+sudo apt install -y python3 python3-flask python3-serial
+sudo systemctl enable --now snapd
+
+1.1) Generador de contrasenas Hash (para app.py)
+sudo apt update
+sudo apt install -y python3-werkzeug
+python3 -c "from werkzeug.security import generate_password_hash; print(generate_password_hash('12345'))"
+
+2) Instalar Arduino CLI (snap)
+sudo snap install arduino-cli
+
+3) Inicializar Arduino CLI y preparar cores
+arduino-cli config init
+arduino-cli core update-index
+arduino-cli core install arduino:avr
+arduino-cli core list
+
+4) Permiso para usar el puerto serial (UNO)
+sudo usermod -aG dialout $USER
+# cerrar sesión y volver a entrar (o reiniciar VM)
+
+5) Verificar que el Arduino se detecta y ver el puerto
+lsusb
+ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
+arduino-cli board list
+
+6) Compilar y subir (ejemplo: proyecto ~/led, sketch en carpeta "ino")
+cd ~/led
+arduino-cli compile --fqbn arduino:avr:uno ino
+arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:uno ino
+
+7) Monitor serial (alternativa recomendada por snap)
+sudo apt install -y picocom
+picocom -b 9600 /dev/ttyACM0
+# salir de picocom: Ctrl+A luego Ctrl+X
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+============================================================
+ARDUINO-CLI: ERRORES COMUNES + SOLUCION + VERIFICACION (VERSION FINAL)
+Enfoque: Ubuntu/Linux (especialmente en VM/VirtualBox) usando Arduino Uno
+============================================================
+
+Objetivo típico:
+- Compilar y subir un sketch (.ino) a Arduino desde terminal con arduino-cli.
+- Ejemplo de sketch:
+  ~/led/ino/ino.ino
+
+Convenciones importantes:
+- En Linux NO existe "COM". El puerto es un archivo:
+  /dev/ttyACM0   (Arduino Uno/MEGA originales o por CDC ACM)
+  /dev/ttyUSB0   (adaptadores USB-Serial / algunas placas)
+- FQBN Arduino Uno:
+  arduino:avr:uno
+
+
+============================================================
+0) COMANDOS BASE DE CHEQUEO (SIEMPRE)
+============================================================
+
+0.1 Ver ruta y versión:
+  which -a arduino-cli
+  arduino-cli version
+
+0.2 Ver placas y puertos detectados:
+  arduino-cli board list
+
+Salida típica esperada (ejemplo):
+- Port: /dev/ttyACM0
+- FQBN: arduino:avr:uno
+- Name: Arduino Uno
+
+Si NO aparece /dev/ttyACM0 o sale "No boards found":
+- Es problema de USB/cable/VM/permisos/instalación (ver Sección B).
+
+0.3 Ver puertos disponibles (equivalente a "ver COM"):
+  ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
+
+0.4 Ver permisos del puerto:
+  ls -l /dev/ttyACM0
+- Debe verse algo como: ... root dialout ...
+- Si tu usuario NO está en dialout → ver B2.
+
+
+============================================================
+A) INSTALACION / EJECUCION DEL CLI
+============================================================
+
+A1) ERROR: "arduino-cli: command not found"
+Síntoma:
+- Al escribir arduino-cli, no existe el comando.
+Causa:
+- No está instalado o PATH incorrecto.
+Solución (instalación oficial en /usr/local/bin):
+1) Instalar curl (si hace falta):
+   sudo apt update
+   sudo apt install -y curl
+
+2) Instalar arduino-cli:
+   curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sudo env BINDIR=/usr/local/bin sh
+
+Verificación:
+   which -a arduino-cli
+   arduino-cli version
+
+
+A2) ERROR: Bash intenta ejecutar /snap/bin/arduino-cli (ya no existe)
+Síntoma:
+- "bash: /snap/bin/arduino-cli: No such file or directory"
+Causa:
+- Eliminaste el snap pero bash guardó la ruta en caché.
+Solución:
+   hash -r
+Verificación:
+   which -a arduino-cli
+   (Debe apuntar a /usr/local/bin/arduino-cli o /usr/bin/arduino-cli)
+
+
+A3) ERROR típico con SNAP: "permission denied" leyendo /sys y no detecta placas
+Síntoma:
+- arduino-cli board list:
+  "open /sys/devices/.../idVendor: permission denied"
+  "No boards found"
+Causa:
+- arduino-cli instalado como SNAP (confinamiento). Frecuente en VM.
+Solución recomendada:
+1) Quitar snap:
+   sudo snap remove arduino-cli
+
+2) Instalar arduino-cli NO-Snap (ver A1).
+
+Verificación:
+   which -a arduino-cli   (NO debe ser /snap/bin/...)
+   arduino-cli board list (ya debe listar /dev/ttyACM0 si el USB está bien)
+
+
+A4) ERROR: "curl: command not found"
+Síntoma:
+- Al usar curl, no existe.
+Causa:
+- curl no instalado.
+Solución:
+   sudo apt update
+   sudo apt install -y curl
+Verificación:
+   curl --version
+
+
+============================================================
+B) DETECCION DE PLACAS / PUERTOS (No boards found)
+============================================================
+
+B1) ERROR: "No boards found" en arduino-cli board list
+Síntoma:
+- arduino-cli board list no detecta ninguna placa.
+Causas típicas:
+- Arduino no conectado o cable malo.
+- En VM: USB NO capturado por VirtualBox.
+- Instalación confinada (snap) (ver A3).
+- Permisos insuficientes al puerto /dev/ttyACM0 (ver B2).
+- Puerto ocupado por otro proceso (ver B3).
+
+Solución / Checklist:
+1) Ver si existe el puerto:
+   ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
+
+2) En VM (VirtualBox):
+- En la ventana de la VM: Dispositivos > USB > seleccionar Arduino.
+- (Si no aparece) habilitar USB 2.0/3.0 en settings y tener Extension Pack.
+
+3) Volver a listar:
+   arduino-cli board list
+
+Verificación:
+- Debe aparecer /dev/ttyACM0 con Arduino Uno y FQBN arduino:avr:uno.
+
+
+B2) ERROR: "permission denied" al abrir /dev/ttyACM0 (en upload o monitor)
+Síntoma:
+- Upload/monitor falla con permiso denegado.
+Causa:
+- Usuario no pertenece al grupo dialout.
+Solución:
+   sudo usermod -aG dialout $USER
+   newgrp dialout
+Verificación:
+   groups
+   (Debe incluir dialout)
+   ls -l /dev/ttyACM0
+
+
+B3) ERROR: Puerto ocupado ("Device or resource busy", "port busy")
+Síntoma:
+- No deja subir o no deja abrir monitor serial.
+Causa:
+- Otro proceso usando /dev/ttyACM0 (monitor abierto, IDE, etc).
+Solución:
+   sudo lsof /dev/ttyACM0
+- Cierra el proceso listado.
+Verificación:
+- Reintenta upload/monitor sin error.
+
+
+B4) El puerto cambia (ttyACM0 -> ttyACM1)
+Síntoma:
+- A veces el Arduino aparece en otro número tras reconectar.
+Causa:
+- Reconexión/reset o reasignación del sistema/VM.
+Solución:
+- Siempre confirmar antes de subir:
+   arduino-cli board list
+Verificación:
+- Usar el puerto actual reportado.
+
+
+============================================================
+C) CORES / PLATAFORMAS / BIBLIOTECAS
+============================================================
+
+C1) ERROR: "Platform 'arduino:avr' not found: platform not installed"
+Síntoma:
+- Al compilar: falta plataforma arduino:avr (Arduino Uno).
+Causa:
+- No instalaste el core AVR.
+Solución:
+   arduino-cli core update-index
+   arduino-cli core install arduino:avr
+Verificación:
+   arduino-cli core list
+   (Debe aparecer arduino:avr)
+   arduino-cli compile --fqbn arduino:avr:uno
+
+
+C2) ERROR: No descarga cores / "Error updating index"
+Síntoma:
+- core update-index falla o no instala.
+Causas:
+- Sin Internet, DNS, proxy, red bloqueada (frecuente en VM).
+Solución:
+1) Probar conectividad:
+   ping -c 2 github.com
+2) Reintentar:
+   arduino-cli core update-index
+Verificación:
+- update-index termina sin error y se puede instalar core.
+
+
+C3) ERROR: Librería faltante
+Síntoma:
+- "fatal error: <Nombre>.h: No such file or directory"
+Causa:
+- Falta la librería del sketch.
+Solución:
+1) Buscar:
+   arduino-cli lib search "Nombre"
+2) Instalar:
+   arduino-cli lib install "Nombre"
+Verificación:
+- Recompilar:
+   arduino-cli compile --fqbn arduino:avr:uno
+
+
+C4) Conflicto de librerías (versiones)
+Síntoma:
+- Errores raros aun con librería instalada.
+Causa:
+- Se está usando otra versión/otra librería con nombre similar.
+Solución:
+   arduino-cli lib list
+- Revisar nombre exacto y includes.
+Verificación:
+- Recompilar sin error.
+
+
+============================================================
+D) COMPILACION
+============================================================
+
+D1) ERROR: Compila el sketch equivocado / no encuentra sketch
+Síntoma:
+- Compila otro proyecto o "Sketch not found".
+Causa:
+- No estás en la carpeta del .ino y no pasaste la ruta.
+Solución:
+1) Entrar a la carpeta del sketch:
+   cd ~/led/ino
+2) Compilar:
+   arduino-cli compile --fqbn arduino:avr:uno
+
+Alternativa (pasar ruta):
+   arduino-cli compile --fqbn arduino:avr:uno ~/led/ino
+
+Verificación:
+- Debe salir:
+  "Sketch uses ... bytes" y "Global variables use ... bytes"
+
+
+D2) ERROR: Errores de sintaxis C/C++
+Síntoma:
+- Mensajes indicando línea/columna (faltan ;, llaves, tipos).
+Causa:
+- Error en el código.
+Solución:
+- Corregir según el mensaje y recompilar.
+Verificación:
+- Compilación exitosa (Sketch uses ...).
+
+
+============================================================
+E) UPLOAD (SUBIDA AL ARDUINO)
+============================================================
+
+E1) Upload imprime solo "New upload port: /dev/ttyACM0 (serial)"
+Síntoma:
+- No sale "Done" claramente.
+Causa:
+- A veces arduino-cli muestra salida mínima.
+Solución/verificación:
+1) Usar verbose:
+   arduino-cli upload -v -p /dev/ttyACM0 --fqbn arduino:avr:uno
+2) Probar el comportamiento del sketch (LED/Serial).
+Verificación:
+- En verbose debe aparecer salida detallada (tipo avrdude) y finalizar sin error.
+
+
+E2) ERROR: "stk500_getsync()", "not in sync", "programmer is not responding"
+Causas típicas:
+- Puerto incorrecto.
+- FQBN/placa incorrecta.
+- Cable/hub USB inestable.
+- Clones: reset/bootloader sensible.
+Solución:
+1) Confirmar puerto:
+   arduino-cli board list
+2) Confirmar FQBN correcto (UNO):
+   arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:uno
+3) Cambiar cable/puerto USB, reconectar.
+4) En clones: presionar RESET justo al iniciar upload (si aplica).
+Verificación:
+- Upload verbose:
+   arduino-cli upload -v -p /dev/ttyACM0 --fqbn arduino:avr:uno
+
+
+E3) ERROR: "avrdude: ser_open(): can't open device ..."
+Causa:
+- Puerto no existe o es incorrecto.
+Solución:
+   ls /dev/ttyACM* /dev/ttyUSB* 2>/dev/null
+   arduino-cli board list
+Verificación:
+- Que exista /dev/ttyACM0 y upload funcione.
+
+
+============================================================
+F) MONITOR SERIAL (PRUEBAS)
+============================================================
+
+F1) Monitor no muestra nada
+Causas:
+- Baudrate incorrecto.
+- Sketch no imprime nada.
+- Puerto equivocado.
+Solución:
+1) Confirmar baudrate en el sketch:
+   Serial.begin(9600);  (ejemplo)
+2) Abrir monitor con ese baud:
+   arduino-cli monitor -p /dev/ttyACM0 -c baudrate=9600
+3) Confirmar puerto:
+   arduino-cli board list
+Verificación:
+- Debe verse salida o respuesta del programa.
+
+Salir del monitor:
+- Presiona Ctrl+C
+
+
+F2) Monitor no abre por puerto ocupado
+Causa:
+- Otro proceso usando el puerto.
+Solución:
+   sudo lsof /dev/ttyACM0
+Verificación:
+- Monitor abre tras cerrar el proceso.
+
+
+============================================================
+G) CHECKLIST RAPIDO (EL QUE CASI SIEMPRE RESUELVE TODO)
+============================================================
+
+1) Ruta y versión:
+   which -a arduino-cli
+   arduino-cli version
+
+2) Placa y puerto:
+   arduino-cli board list
+
+3) Si falta core:
+   arduino-cli core update-index
+   arduino-cli core install arduino:avr
+
+4) Compilar (en carpeta del .ino):
+   cd ~/led/ino
+   arduino-cli compile --fqbn arduino:avr:uno
+
+5) Subir:
+   arduino-cli upload -p /dev/ttyACM0 --fqbn arduino:avr:uno
+
+6) Verificar (si hace falta):
+   arduino-cli upload -v -p /dev/ttyACM0 --fqbn arduino:avr:uno
+   arduino-cli monitor -p /dev/ttyACM0 -c baudrate=9600
+
+============================================================
+FIN
+============================================================
+
+
+Ejemplo de Codigo
+____________________________________________________________________
+
+const int LED_PIN = 13;
+
+void setup() {
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+  Serial.begin(9600);
+}
+
+void loop() {
+  if (Serial.available()) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+
+    if (cmd == "LED_ON") {
+      digitalWrite(LED_PIN, HIGH);
+      Serial.println("OK:LED_ON");
+    } else if (cmd == "LED_OFF") {
+      digitalWrite(LED_PIN, LOW);
+      Serial.println("OK:LED_OFF");
+    } else {
+      Serial.println("ERR:CMD");
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
